@@ -14,3 +14,14 @@ def convert_to_prepared_statement(data_class: Any, data: Any) -> str:
     prepared_statement = sql.SQL(insert_statement).format(sql.Identifier(table_name)) + sql.SQL(" ") + on_conflict_statement
 
     return prepared_statement.as_string()
+    
+    def convert_to_prepared_statement(data_class: Any) -> str:
+    table_name = data_class.__name__.lower()
+    fields = ', '.join(data_class.__annotations__.keys())
+    placeholders = ', '.join('%s' for _ in range(len(data_class.__annotations__)))
+
+    insert_statement = f"INSERT INTO {table_name} ({fields}) VALUES ({placeholders})"
+    on_conflict_statement = f"ON CONFLICT ({data_class.__annotations__.keys()[0]}) DO NOTHING"
+    prepared_statement = sql.SQL(insert_statement).format(sql.Identifier(table_name)) + sql.SQL(" ") + sql.SQL(on_conflict_statement)
+
+    return prepared_statement.as_string()
