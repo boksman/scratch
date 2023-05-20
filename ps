@@ -1,0 +1,32 @@
+
+from dataclasses import dataclass
+from typing import Any
+import psycopg2
+
+@dataclass
+class Person:
+    id: int
+    name: str
+    age: int
+
+def convert_to_prepared_statement(data_class: Any, data: Any) -> str:
+    table_name = data_class.__name__.lower()
+    fields = ', '.join(data_class.__annotations__.keys())
+    placeholders = ', '.join('%s' for _ in range(len(data_class.__annotations__)))
+
+    insert_statement = f"INSERT INTO {table_name} ({fields}) VALUES ({placeholders})"
+    prepared_statement = psycopg2.sql.SQL(insert_statement).format(psycopg2.sql.Identifier(table_name))
+
+    return prepared_statement.as_string(conn)
+
+def insert_data_into_database(prepared_statement: str, data: tuple):
+    cursor = conn.cursor()
+    cursor.execute(prepared_statement, data)
+    conn.commit()
+    cursor.close()
+
+# Example usage
+person = Person(id=1, name="John", age=25)
+prepared_statement = convert_to_prepared_statement(Person, person)
+data = (person.id, person.name, person.age)
+insert_data_into_database(prepared_statement, data)
