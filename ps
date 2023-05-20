@@ -1,32 +1,16 @@
-
-from dataclasses import dataclass
-from typing import Any
-import psycopg2
-
-@dataclass
-class Person:
-    id: int
-    name: str
-    age: int
-
 def convert_to_prepared_statement(data_class: Any, data: Any) -> str:
     table_name = data_class.__name__.lower()
     fields = ', '.join(data_class.__annotations__.keys())
     placeholders = ', '.join('%s' for _ in range(len(data_class.__annotations__)))
 
     insert_statement = f"INSERT INTO {table_name} ({fields}) VALUES ({placeholders})"
-    prepared_statement = psycopg2.sql.SQL(insert_statement).format(psycopg2.sql.Identifier(table_name))
+    update_columns = [field for field in data_class.__annotations__.keys() if field != 'id']  # Exclude primary key from update
+    update_values = [sql.SQL(f"EXCLUDED.{field}") for field in update_columns]
+    update_clause = sql.SQL(", ").join([
+        sql.SQL("{0} = {1}").format(sql.Identifier(field), value)
+        for field, value in zip(update_columns, update_values)
+    ])
+    on_conflict_statement = sql.SQL("ON CONFLICT (id) DO UPDATE SET {}").format(update_clause)
+    prepared_statement = sql.SQL(insert_statement).format(sql.Identifier(table_name)) + sql.SQL(" ") + on_conflict_statement
 
-    return prepared_statement.as_string(conn)
-
-def insert_data_into_database(prepared_statement: str, data: tuple):
-    cursor = conn.cursor()
-    cursor.execute(prepared_statement, data)
-    conn.commit()
-    cursor.close()
-
-# Example usage
-person = Person(id=1, name="John", age=25)
-prepared_statement = convert_to_prepared_statement(Person, person)
-data = (person.id, person.name, person.age)
-insert_data_into_database(prepared_statement, data)
+    return prepared_statement.as_string()
