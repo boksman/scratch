@@ -1,11 +1,6 @@
-
-If a field is not nullable (i.e., it doesn't allow None values), but the dictionary contains a null value for that field, the validation function should consider it as an error and return the appropriate HTTP status code. Here's an updated version of the function that handles this scenario:
-
-python
-Copy code
 import inspect
 from dataclasses import fields, is_dataclass
-from typing import Dict, Type, Optional
+from typing import Dict, Type, Optional, Union, get_origin, get_args
 
 def validate_dataclass(dictionary: Dict[str, Optional], dataclass_type: Type) -> Optional[int]:
     if not is_dataclass(dataclass_type):
@@ -20,6 +15,10 @@ def validate_dataclass(dictionary: Dict[str, Optional], dataclass_type: Type) ->
         field_value = dictionary.get(field.name)
         
         if field_value is None and not field.default:
+            field_type = field.type
+            if get_origin(field_type) is Union and type(None) in get_args(field_type):
+                continue  # Skip optional fields
+        
             return 400  # Bad Request - Non-optional field is missing or null
         
         if field_value is not None and not isinstance(field_value, field.type):
